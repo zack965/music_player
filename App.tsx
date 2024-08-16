@@ -10,6 +10,8 @@ export default function App() {
   const [soundApp, setSoundApp] = useState<Audio.Sound | null>(null);
 
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [IsAudioPlaying, setIsAudioPlaying] = useState(false)
+  const [lastPlaybackPosition, setLastPlaybackPosition] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -33,24 +35,47 @@ export default function App() {
   }, []);
   const playSound = async (audio: MediaLibrary.Asset) => {
     if (audio) {
+      setIsAudioPlaying(true)
+
       if (soundApp) {
         await soundApp.stopAsync();
+        setLastPlaybackPosition(null);
       }
       const { sound } = await Audio.Sound.createAsync({ uri: audio.uri });
       setSoundApp(sound);
-      await sound.playAsync();
+      if (lastPlaybackPosition) {
+        await sound.playFromPositionAsync(lastPlaybackPosition);
+      } else {
+        await sound.playAsync();
+      }
     }
   };
-  const stopSound = async (audio: Audio.Sound | null) => {
-    if (audio) {
-      setSoundApp(null)
-      await audio.stopAsync();
-    }
-  }
   const playCurrentSound = async (audio: Audio.Sound | null) => {
     if (audio) {
+      // console.log("object")
+      const status = await audio.getStatusAsync();
+      if (status.isLoaded) {
+        setIsAudioPlaying(true)
+        if (lastPlaybackPosition) {
+          await audio.playFromPositionAsync(lastPlaybackPosition);
+        } else {
+          await audio.playAsync();
+        }
 
-      await audio.playAsync();
+      }
+    }
+  }
+
+  const stopSound = async (audio: Audio.Sound | null) => {
+    if (audio) {
+      // setSoundApp(null)
+      const status = await audio.getStatusAsync();
+      if (status.isLoaded) {
+        setLastPlaybackPosition(status.positionMillis);
+      }
+      setIsAudioPlaying(false)
+
+      await audio.pauseAsync();
     }
   }
 
@@ -119,7 +144,7 @@ export default function App() {
               {AppCurrentAudio?.filename}
 
             </Text>
-            {soundApp ? <Button title="Stop Audio" onPress={() => {
+            {IsAudioPlaying ? <Button title="Stop Audio" onPress={() => {
               stopSound(soundApp)
             }} /> : <Button title="play Audio" onPress={() => {
               playCurrentSound(soundApp)
