@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, FlatList, ScrollView } from 'react-native';
+import { View, Text, Button, ScrollView } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
 
@@ -8,86 +7,65 @@ export default function App() {
   const [audioFiles, setAudioFiles] = useState<MediaLibrary.Asset[]>([]);
   const [AppCurrentAudio, setAppCurrentAudio] = useState<MediaLibrary.Asset | null>(null);
   const [soundApp, setSoundApp] = useState<Audio.Sound | null>(null);
-
   const [permissionGranted, setPermissionGranted] = useState(false);
-  const [IsAudioPlaying, setIsAudioPlaying] = useState(false)
+  // const [IsAudioPlaying, setIsAudioPlaying] = useState(false);
   const [lastPlaybackPosition, setLastPlaybackPosition] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
-      // Request permission to access media files
       const { status } = await MediaLibrary.requestPermissionsAsync();
       setPermissionGranted(status === 'granted');
 
       if (status === 'granted') {
         fetchAudioFiles();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          staysActiveInBackground: true,
-          playsInSilentModeIOS: true,
-          // interruptionModeIOS: Audio,
-          //interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
+
       }
     })();
   }, []);
-  const playSound = async (audio: MediaLibrary.Asset) => {
-    if (audio) {
-      setIsAudioPlaying(true)
 
+  const preloadSound = async (audio: MediaLibrary.Asset) => {
+    if (audio) {
       if (soundApp) {
-        await soundApp.stopAsync();
-        setLastPlaybackPosition(null);
+        await soundApp.unloadAsync();
+        setSoundApp(null);
       }
+
       const { sound } = await Audio.Sound.createAsync({ uri: audio.uri });
       setSoundApp(sound);
+    }
+  };
+
+  const playSound = async () => {
+    if (soundApp) {
+      // setIsAudioPlaying(true);
+
       if (lastPlaybackPosition) {
-        await sound.playFromPositionAsync(lastPlaybackPosition);
+        await soundApp.playFromPositionAsync(lastPlaybackPosition);
       } else {
-        await sound.playAsync();
+        await soundApp.playAsync();
       }
     }
   };
-  const playCurrentSound = async (audio: Audio.Sound | null) => {
-    if (audio) {
-      // console.log("object")
-      const status = await audio.getStatusAsync();
-      if (status.isLoaded) {
-        setIsAudioPlaying(true)
-        if (lastPlaybackPosition) {
-          await audio.playFromPositionAsync(lastPlaybackPosition);
-        } else {
-          await audio.playAsync();
-        }
 
-      }
-    }
-  }
-
-  const stopSound = async (audio: Audio.Sound | null) => {
-    if (audio) {
-      // setSoundApp(null)
-      const status = await audio.getStatusAsync();
+  const stopSound = async () => {
+    if (soundApp) {
+      const status = await soundApp.getStatusAsync();
       if (status.isLoaded) {
         setLastPlaybackPosition(status.positionMillis);
+        await soundApp.pauseAsync();
       }
-      setIsAudioPlaying(false)
-
-      await audio.pauseAsync();
+      // setIsAudioPlaying(false);
     }
-  }
-
+  };
 
   const fetchAudioFiles = async () => {
     let media = await MediaLibrary.getAssetsAsync({
       mediaType: MediaLibrary.MediaType.audio,
-      first: 1000, // Number of files to fetch, adjust as needed
+      first: 1000,
     });
+
     const isEnglishLetter = (char: string) => /^[a-zA-Z]$/.test(char);
 
-    // Sort the audio files based on the first character
     const sortedAudioFiles = media.assets
       .map(asset => ({
         ...asset,
@@ -96,19 +74,15 @@ export default function App() {
       .sort((a, b) => {
         const charA = a.firstChar;
         const charB = b.firstChar;
-
-        // Check if characters are non-English letters or numbers
         const isAEnglish = isEnglishLetter(charA);
         const isBEnglish = isEnglishLetter(charB);
 
         if (!isAEnglish && isBEnglish) {
-          return 1; // Non-English letter or number should come after English letter
+          return 1;
         }
         if (isAEnglish && !isBEnglish) {
-          return -1; // English letter should come before non-English letter or number
+          return -1;
         }
-
-        // Both characters are either English or non-English, sort alphabetically
         if (charA < charB) {
           return -1;
         }
@@ -117,70 +91,45 @@ export default function App() {
         }
         return 0;
       });
+
     setAudioFiles(sortedAudioFiles);
   };
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView style={{ width: "100%", height: "90%", paddingLeft: 20, paddingRight: 20, paddingTop: 40 }}>
+      <ScrollView style={{ width: '100%', height: '90%', paddingLeft: 20, paddingRight: 20, paddingTop: 40 }}>
         {audioFiles.map((item) => (
           <View key={item.id} style={{ marginBottom: 10, marginTop: 10 }}>
             <Text>{item.filename}</Text>
             <Button
-              title="Play"
-              onPress={() => {
-                // TODO: Implement audio playback here
-                setAppCurrentAudio(item)
-                playSound(item)
+              title="Load & Play"
+              onPress={async () => {
+                setAppCurrentAudio(item);
+                await preloadSound(item);
+                playSound();
               }}
             />
           </View>
         ))}
       </ScrollView>
       {AppCurrentAudio ? (
-        <View style={{ width: "100%", height: "10%" }}>
-          <View style={{ height: "100%", justifyContent: "center", alignItems: "center", backgroundColor: "#f6f6f6" }}>
-            <Text>
-              {AppCurrentAudio?.filename}
+        <View style={{ width: '100%', height: '10%' }}>
+          <View style={{ height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f6f6f6' }}>
+            <Text>{AppCurrentAudio?.filename}</Text>
 
-            </Text>
-            {IsAudioPlaying ? <Button title="Stop Audio" onPress={() => {
-              stopSound(soundApp)
-            }} /> : <Button title="play Audio" onPress={() => {
-              playCurrentSound(soundApp)
-            }} />}
+            <Button title="Play Audio" onPress={playSound} />
+
+            <Button title="Pause Audio" onPress={stopSound} />
 
           </View>
         </View>
       ) : (
-        <View style={{ width: "100%", height: "10%" }}>
-          <View style={{ height: "100%", justifyContent: "center", alignItems: "center", backgroundColor: "#f6f6f6" }}>
-            <Text>
-              no adusio selected
-            </Text>
+        <View style={{ width: '100%', height: '10%' }}>
+          <View style={{ height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f6f6f6' }}>
+            <Text>No audio selected</Text>
           </View>
         </View>
       )}
-
     </View>
   );
 }
-
-/*
-
-
-{permissionGranted ? (
-        <FlatList
-          style={{ height: '70%', }}
-          data={audioFiles}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <Text>{item.filename}</Text>
-          )}
-        />
-      ) : (
-        <Text>Permission not granted to access media files.</Text>
-      )}
-
-
-      */
