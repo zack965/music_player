@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, ScrollView } from 'react-native';
+import { View, Text, Button, ScrollView, TouchableOpacity } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
-
+import Feather from '@expo/vector-icons/Feather';
+import AntDesign from '@expo/vector-icons/AntDesign';
 export default function App() {
   const [audioFiles, setAudioFiles] = useState<MediaLibrary.Asset[]>([]);
   const [AppCurrentAudio, setAppCurrentAudio] = useState<MediaLibrary.Asset | null>(null);
   const [soundApp, setSoundApp] = useState<Audio.Sound | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
-  // const [IsAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [IsAudioPlaying, setIsAudioPlaying] = useState(false);
   const [lastPlaybackPosition, setLastPlaybackPosition] = useState<number | null>(null);
 
   useEffect(() => {
@@ -32,20 +33,17 @@ export default function App() {
 
       const { sound } = await Audio.Sound.createAsync({ uri: audio.uri });
       setSoundApp(sound);
-    }
-  };
-
-  const playSound = async () => {
-    if (soundApp) {
-      // setIsAudioPlaying(true);
+      setIsAudioPlaying(true);
 
       if (lastPlaybackPosition) {
-        await soundApp.playFromPositionAsync(lastPlaybackPosition);
+        await sound.playFromPositionAsync(lastPlaybackPosition);
       } else {
-        await soundApp.playAsync();
+        await sound.playAsync();
       }
     }
   };
+
+
 
   const stopSound = async () => {
     if (soundApp) {
@@ -54,7 +52,7 @@ export default function App() {
         setLastPlaybackPosition(status.positionMillis);
         await soundApp.pauseAsync();
       }
-      // setIsAudioPlaying(false);
+      setIsAudioPlaying(false);
     }
   };
 
@@ -97,34 +95,47 @@ export default function App() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView style={{ width: '100%', height: '90%', paddingLeft: 20, paddingRight: 20, paddingTop: 40 }}>
+      <ScrollView style={{ width: '100%', height: '85%', paddingLeft: 20, paddingRight: 20, paddingTop: 40 }}>
         {audioFiles.map((item) => (
-          <View key={item.id} style={{ marginBottom: 10, marginTop: 10 }}>
+          <TouchableOpacity style={{ marginBottom: 10, marginTop: 10, flexDirection: "row" }} onPress={async () => {
+            setAppCurrentAudio(item);
+            await preloadSound(item);
+            //playSound();
+          }}>
+            <Feather name="music" size={24} color="black" style={{ marginRight: "5%" }} />
             <Text>{item.filename}</Text>
-            <Button
-              title="Load & Play"
-              onPress={async () => {
-                setAppCurrentAudio(item);
-                await preloadSound(item);
-                playSound();
-              }}
-            />
-          </View>
+
+          </TouchableOpacity>
         ))}
       </ScrollView>
       {AppCurrentAudio ? (
-        <View style={{ width: '100%', height: '10%' }}>
+        <View style={{ width: '100%', height: '15%' }}>
           <View style={{ height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f6f6f6' }}>
             <Text>{AppCurrentAudio?.filename}</Text>
 
-            <Button title="Play Audio" onPress={playSound} />
+            {/*   <Button title="Play Audio" onPress={playSound} />
 
-            <Button title="Pause Audio" onPress={stopSound} />
+            <Button title="Pause Audio" onPress={stopSound} /> */}
+            <View style={{ flexDirection: "row" }}>
+              {IsAudioPlaying ?
+                <TouchableOpacity onPress={async () => {
+                  await stopSound();
+                }}>
+                  <AntDesign name="pause" size={24} color="black" />
+                </TouchableOpacity> :
+                <TouchableOpacity onPress={() => {
+                  //  await playSound();
+                  // async
+                }}>
+                  <AntDesign name="playcircleo" size={24} color="black" />
+                </TouchableOpacity>}
+
+            </View>
 
           </View>
         </View>
       ) : (
-        <View style={{ width: '100%', height: '10%' }}>
+        <View style={{ width: '100%', height: '15%' }}>
           <View style={{ height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f6f6f6' }}>
             <Text>No audio selected</Text>
           </View>
